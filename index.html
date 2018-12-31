@@ -1,0 +1,325 @@
+<!DOCTYPE HTML>
+<html><head>
+<meta charset="utf-8">
+<title>成语重组</title>
+
+<!-- <link rel="stylesheet" href="http://jqueryui.com/themes/base/jquery.ui.all.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.21/jquery-ui.min.js"type="text/javascript"></script>
+-->
+<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/themes/base/jquery-ui.css" type="text/css" media="all" /> 
+<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.7.2.min.js" type="text/javascript"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/jquery-ui.min.js" type="text/javascript"></script>
+
+<style>
+	#page{ width: 900px; height: 1000px; margin-left: auto; margin-right: auto; border: blue thin solid;}
+	#container { width: 100%; height: 100%; margin-left: auto; margin-right: auto; border: red thin solid; }
+	#drag-container { float:left; width:250px; }
+	#drop-container { float:right; clear:both; }
+	.draggable { width: 60px; height: 60px; float: left; cursor: move; background-color:#666;}
+	.draggable p {color:#FF6; text-align:center;}
+	.dropzone { width: auto; height: 100px; border: green thin solid; }
+	.droppable { width: 80px; height: 80px; float: left; margin: 10px;background-color:#FC6; border: #FC6 1px solid; border-radius:15px;}
+	td{width: 60px; height: 60px;}
+	#timer{ font-weight:800; font-size:30px; width:300px; height:40px; float:left; text-align:center;}
+	#buttons{ font-size:12px;float:left;}
+</style>
+</head>
+
+<body>
+<script type="text/javascript">
+var main_item_list = ["脱颖而出", "不可思议", "一丝不苟", "一鸣惊人", "一窍不通", "自由自在"];
+var difficulty_beginner = 1;
+var difficulty_intermediate = 2;
+var difficulty_expert = 3;
+
+var count_down_time;
+var timer_object;
+var result_count = 0;
+
+function retrieve_random_chengyu(difficulty,num){
+	$.ajax('http://experiment.leadhoster.com/beta/chengyu/query/functions.php?f=getRandomChengYus',
+	{data:{amount:num,level:difficulty,format:"json"},
+	type:'POST',
+	async:false,
+	success:function(data){
+		main_item_list = data.split(',');
+		for(var i = 0;i < main_item_list.length;i++){
+			console.log(main_item_list[i]);
+		}
+	}
+	});
+}
+
+function generate_droppable(){
+	for (var i =0;i<main_item_list.length;i++){
+			$("#drop-container").append('<div id="set'+(parseInt(i) +1)+'" class="dropzone"></div>');
+			for(var x=0;x<4;x++){
+				$("#set"+(parseInt(i) +1)).append('<div class=" droppable" id="pos'+(parseInt(x)+1)+'"><div>');
+			}
+		}
+}
+
+function generate_draggable(){
+	var datas = new Array();
+	var counter = 0;
+	for (var i =0;i<main_item_list.length;i++){
+		for(var x=0;x<4;x++){
+			//$("#container").append('<div class="ui-widget-content draggable"><p>'+main_item_list[i].charAt(x)+'</p></div>');
+			datas[counter] = '<div class=" draggable"><p>'+main_item_list[i].charAt(x)+'</p></div>';
+			counter++;
+		}
+	}
+	
+	var drag_table = '<table border="0">';
+	var data_len = datas.length / 4;
+	for(var i =0;i<data_len;i++){
+			drag_table += '<tr>';
+		for(var x = 0; x<4;x++){
+			
+			drag_table += '<td>'+datas.splice(getRandomInt(0,(datas.length -1)),1)[0] +'</td>';
+		}
+		drag_table += '</tr>';
+	}
+	drag_table += '</table>';
+	$("#drag-container").append(drag_table);
+}
+
+function timer()
+{
+	if(count_down_time > 0){
+		count_down_time--;
+		$('#timer').html('Time Left: '+count_down_time+'s');
+	}else{
+		stop_timer(timer_object);
+		$("#end-dialog-message p" ).html('Game Over !.. You score '+result_count+'/'+main_item_list.length);
+		$("#end-dialog-message" ).dialog("open");
+	}
+}
+
+function start_timer(time){
+	count_down_time = time;
+	timer_object = setInterval(function(){timer()},1000);
+}
+
+function stop_timer(timer_object){
+	$('.draggable').draggable( "option", "disabled", true );
+	clearInterval(timer_object);
+}
+
+function correct_match(){
+	result_count++;
+	if(result_count == main_item_list.length){
+		$('#end-dialog-message p').html('Congratulation! You score '+result_count+'/'+main_item_list.length);
+		$('#end-dialog-message').dialog('open');
+		stop_timer(timer_object);
+	}
+}
+
+
+function start_game(difficulty,time){
+	result_count = 0;
+	stop_timer(timer_object);
+	start_timer(time);
+	$('#drop-container').empty();
+	$('#drag-container').empty();
+	retrieve_random_chengyu(difficulty,6);
+	generate_droppable();
+	generate_draggable();
+	
+	$( ".draggable" ).draggable({ containment: $("#page") });
+	
+	$( ".droppable" ).droppable({
+			tolerance: "pointer",
+			drop: function( event, ui ) {
+				var id = $(this).parent().attr("id");
+				
+				if(!$(this).hasClass(id)){
+					
+					$( this ).addClass(id).droppable( "option" , "accept" , "."+id );
+						
+					$(ui.draggable).addClass(id);
+					$(ui.draggable).attr("title",id);
+					$(ui.draggable).attr("id",$(this).attr("id"));
+
+					var parent = $(this); 
+					var margin_top = parent.css('margin-top').replace('px', ''); 
+					var margin_left = parent.css('margin-left').replace('px', '');
+					$(this).css('background-color','#6FF');
+					$(ui.draggable).css('position', 'absolute');
+					$(ui.draggable).css('top',parent.position().top + parseInt(margin_top) + ((parent.height() - $(ui.draggable).height()) / 2));
+					$(ui.draggable).css('left',parent.position().left + parseInt(margin_left) + ((parent.width() - $(ui.draggable).width()) / 2));
+					
+					
+					var items = $(this).parent().find(".droppable."+id);
+					if(items.length == 4){
+						var text = "";
+						for(var i = 0;i<items.length;i++){
+							$('#container').find("#pos"+ (parseInt(i) + 1)+'.draggable.'+id).each(function(){
+								text += $(this).find("p").text();
+							});
+						}
+						//check results for a single set
+						if(isMatched(text) == -1){
+							$(this).parent().css('background-color','#F00');
+						}else{
+							correct_match();
+							$('.draggable[title="'+$(ui.draggable).attr('title')+'"]').draggable( "option", "disabled", true );
+							$(this).parent().css('background-color','#0F3');	
+						}
+					}
+				}
+			},
+			out:function(event,ui){
+				var id = $(this).parent().attr("id");
+				
+				$(this).removeClass( id ).droppable( "option" , "accept" , "*" );
+				$(ui.draggable).removeClass(id);
+				$(ui.draggable).removeAttr("id");
+				$(ui.draggable).removeAttr("title");
+				$(this).css('background-color','#FC6');
+				
+				var items = $(this).parent().find(".droppable."+id);
+				if(items.length != 4){
+					$(this).parent().css('background-color','');	
+				}
+			}
+		});
+		
+		$('.draggable').on('dblclick',function(e){
+			
+			if(!$(this).draggable( "option", "disabled" )){
+			if($(this).attr('id') != null){
+
+			//$(document).find('#'+$(this).attr('title')+' #'+$(this).attr('id'));
+			
+				var id = $('#'+$(this).attr('title')+' #'+$(this).attr('id')).parent().attr("id");
+				
+				$('#'+$(this).attr('title')+' #'+$(this).attr('id')).removeClass( "ui-state-highlight" ).removeClass( id ).droppable( "option" , "accept" , "*" );
+				
+				$('#'+$(this).attr('title')+' #'+$(this).attr('id')).css('background-color','#FC6');
+				
+				var items = $('#'+$(this).attr('title')+' #'+$(this).attr('id')).parent().find(".droppable."+id);
+				
+				if(items.length != 4){
+					$('#'+$(this).attr('title')+' #'+$(this).attr('id')).parent().css('background-color','');	
+				}
+				
+				$(this).removeClass(id);
+				$(this).removeAttr("id");
+				$(this).removeAttr("title");
+				
+			}
+				$(this).css('left','');
+				$(this).css('top','');
+				$(this).css('position','relative');
+			}
+		});
+}
+
+function getRandomInt (min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// -1 = no matched found.
+// returns the index of the found element.
+function isMatched(data){
+	return $.inArray(data,main_item_list);
+}
+
+$(document).ready(function(e) {
+	$( "#end-dialog-message" ).dialog({
+			modal: true,
+			autoOpen : false,
+			buttons: {
+				Ok: function() {
+					$( this ).dialog( "close" );
+				},
+				Replay:function(){
+					$( this ).dialog( "close" );
+					$( "#difficulity-dialog-message" ).dialog( "open" );
+				}
+			}
+		});
+	
+		$( "#difficulity-dialog-message" ).dialog({
+			modal: true,
+			autoOpen : true,
+			resizable:false,
+			draggable : false,
+			minWidth : 500,
+			buttons: {
+				Beginner: function() {
+					$( this ).dialog( "close" );
+					start_game(difficulty_beginner,180);
+				},
+				Intermediate : function() {
+					$( this ).dialog( "close" );
+					start_game(difficulty_intermediate,120);
+				},
+				Expert : function() {
+					$( this ).dialog( "close" );
+					start_game(difficulty_expert,60);
+				}
+			}
+		});
+		
+		$( "#info-dialog-message" ).dialog({
+			modal: true,
+			autoOpen : false,
+			buttons: {
+				Ok: function() {
+					$( this ).dialog( "close" );
+					$( "#difficulity-dialog-message" ).dialog('open');
+				},
+			}
+		});
+		
+		$(".button").button();
+		$('#btnRestart').button( "option" , 'icons' , {primary:'ui-icon ui-icon-refresh'} )
+		$('#btnInfo').button( "option" , 'icons' , {primary:'ui-icon ui-icon-info'} )
+		
+		
+		$('#btnRestart').on('click',function(e){
+				$( "#difficulity-dialog-message" ).dialog('open');
+		});
+		$('#btnInfo').on('click',function(e){
+				$( "#info-dialog-message" ).dialog('open');
+		});
+});
+</script>
+
+    <div id="page">
+    	<div id="timer">- - - - -</div>
+        <div id="buttons">
+        	<button class="button" id="btnRestart">Restart</button>
+            <button class="button" id="btnInfo">Info</button>
+        </div>
+        <div id="container">
+        	<div id="drop-container"></div>
+        	<div id="drag-container"></div>
+        </div>
+    </div>
+    
+    <div id="end-dialog-message">
+        <p>
+        </p>
+    </div>
+    
+     <div id="difficulity-dialog-message">
+        <p>
+            Please Select a Difficulity
+        </p>
+    </div>
+    
+    <div id="info-dialog-message">
+        <p>
+            Drag chinese character to form a idioms
+        </p>
+        <p>
+			Double click on the character to return it to its original position.
+        </p>
+    </div>
+</div>
+</body>
+</html>
